@@ -9,18 +9,22 @@ postsRouter.get("/", async (req, res) => {
   try {
     const page = req.query.page || 1;
     const limit = req.query.limit || 6;
-    const category = req.query.category;
+    const category = req.query.category || "";
     const keyword = req.query.keyword;
 
-    const offset = (page - 1) * limit;
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.max(1, Math.min(100, limit));
 
-    let query = "select * from posts";
+    const offset = (safePage - 1) * safeLimit;
+
+    let query =
+      "select posts.id, posts.image, categories.name as category, posts.title, posts.description, posts.date, posts.content, statuses.status, posts.likes_count from posts inner join categories on posts.category_id = categories.id inner join statuses on posts.status_id = statuses.id";
     let conditions = [];
     let values = [];
 
     if (category) {
-      conditions.push(`category_id = $${values.length + 1}`);
-      values.push(category);
+      conditions.push(`categories.name ilike $${values.length + 1}`);
+      values.push(`%${category}%`);
     }
 
     if (keyword) {
@@ -36,22 +40,24 @@ postsRouter.get("/", async (req, res) => {
       query += ` where ` + conditions.join(" and ");
     }
 
-    query += ` limit $${values.length + 1} offset $${values.length + 2}`;
-    values.push(limit, offset);
+    query += ` order by posts.date desc limit $${values.length + 1} offset $${
+      values.length + 2
+    }`;
+    values.push(safeLimit, offset);
 
     const results = await pool.query(query, values);
 
     const totalPostsResult = await pool.query("select count(*) from posts");
     const totalPosts = totalPostsResult.rows[0].count;
-    const totalPages = Math.ceil(totalPosts / limit);
+    const totalPages = Math.ceil(totalPosts / safeLimit);
 
-    const nextPage = page < totalPages ? page + 1 : null;
+    const nextPage = safePage < totalPages ? safePage + 1 : null;
 
     return res.status(200).json({
       totalPosts: totalPosts,
       totalPages: totalPages,
-      currentPage: page,
-      limit: limit,
+      currentPage: safePage,
+      limit: safeLimit,
       posts: results.rows,
       nextPage: nextPage,
     });
@@ -74,7 +80,7 @@ postsRouter.get("/:postId", async (req, res) => {
         message: "Server could not find a requested post",
       });
     }
-    return res.status(201).json({
+    return res.status(200).json({
       data: results.rows[0],
     });
   } catch (error) {
@@ -85,7 +91,7 @@ postsRouter.get("/:postId", async (req, res) => {
   }
 });
 
-postsRouter.post("/", [validateCreatePostData], async (req, res) => {
+postsRouter.post("/", async (req, res) => {
   const newPost = {
     ...req.body,
   };
