@@ -1,5 +1,4 @@
 import express from "express";
-import { Router } from "express";
 import pool from "../utills/db.mjs";
 import { validateCreatePostData } from "../middlewares/post.validation.mjs";
 
