@@ -71,9 +71,23 @@ postsRouter.get("/", async (req, res) => {
 postsRouter.get("/:postId", async (req, res) => {
   try {
     const postIdFromClient = req.params.postId;
-    const results = await pool.query(`select * from posts where id = $1`, [
-      postIdFromClient,
-    ]);
+    const results = await pool.query(
+      `select posts.id, 
+       posts.image, 
+       categories.name AS category, 
+       posts.title, 
+       posts.description, 
+       posts.date, 
+       posts.content, 
+       statuses.status AS status, 
+       posts.likes_count
+from posts
+inner join categories ON posts.category_id = categories.id
+inner join statuses ON posts.status_id = statuses.id
+where posts.id = $1;
+`,
+      [postIdFromClient]
+    );
     if (!results.rows[0]) {
       return res.status(404).json({
         message: "Server could not find a requested post",
